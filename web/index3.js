@@ -99,6 +99,7 @@ const controls = {
         id: 0,
         name: 'test',
         type: 'sphere',
+        material: 'default',
         origin: { x: 0.0, y: 0.0, z: 0.0 },
         radius: 1.0,
         duplicate: () => {
@@ -182,6 +183,13 @@ const objects = {
     ]
 }
 
+const rust = {
+    run: () => {
+
+    }
+};
+gui.add(rust, 'run').name('run ray tracer');
+
 const folders = { material: {}, shape: {} };
 
 // SHAPE SETTINGS FOLDER
@@ -209,6 +217,13 @@ folders.shape.settings.add(controls.shape, 'type',
         const shape = objects.shapes.find(shape => shape.id === currentShapeId);
         shape.type = newValue;
         updateShapeType(shape);
+    });
+
+folders.shape.settings.add(controls.shape, 'material',
+    []).listen().onChange(newValue => {
+        const shape = objects.shapes.find(shape => shape.id === currentShapeId);
+        shape.material = newValue;
+        console.log(folders.shape.settings.__controllers[2]);
     });
 
 folders.shape.settings.add(controls.shape.origin, 'x').listen().onChange(newValue => {
@@ -391,4 +406,21 @@ objects.shapes.forEach(shape => {
 let currentShapeId = objects.shapes[0].id;
 objects.shapes[0].action();
 
+const materialOptions = () => {
+    // console.log(folders.shape.settings, folders.shape.settings.__controllers[2].__select[0]);
+    // const material = objects.materials.find(material => material.id === currentMaterialId);
+    const materialController = getController(folders.shape.settings, 'material');
+
+    objects.materials.forEach(material => {
+        const optionElement = document.createElement('option');
+        optionElement.innerText = material.name;
+        optionElement.value = material.id;
+        const selectElement = materialController.domElement.children[0];
+        selectElement.appendChild(optionElement);
+    });
+
+    materialController.setValue(currentMaterialId);
+}
+materialOptions();
 console.log(objects);
+
