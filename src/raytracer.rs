@@ -1,27 +1,30 @@
 use glam::{Vec2, Vec3A};
-use indicatif::{ProgressBar, ProgressStyle};
-use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Write;
 
-// #[cfg(not(target_family = "wasm"))]
+#[cfg(not(target_family = "wasm"))]
+use indicatif::{ProgressBar, ProgressStyle};
+#[cfg(not(target_family = "wasm"))]
+use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
+#[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Image {
     pub width: usize,
     pub height: usize,
     pub pixels: Vec<[u8; 3]>,
 }
 
+#[allow(dead_code)]
 pub fn random_scene(objects: &mut Objects, n: i16) {
-    objects.add_lambertian_sphere(
+    objects.add_lambert_sphere(
         Sphere {
             origin: Vec3A::new(0.0, -1000.0, 0.0),
             radius: 1000.0,
         },
-        Lambertian {
+        Lambert {
             color: Vec3A::new(0.5, 0.5, 0.5),
         },
     );
@@ -44,9 +47,9 @@ pub fn random_scene(objects: &mut Objects, n: i16) {
 
             let r = rand::random::<f32>();
             if r < 0.5 {
-                objects.add_lambertian_sphere(
+                objects.add_lambert_sphere(
                     sphere,
-                    Lambertian {
+                    Lambert {
                         color: rand_vec3a(0.0, 1.0) * rand_vec3a(0.0, 1.0),
                     },
                 );
@@ -69,12 +72,12 @@ pub fn random_scene(objects: &mut Objects, n: i16) {
         }
     }
 
-    objects.add_lambertian_sphere(
+    objects.add_lambert_sphere(
         Sphere {
             origin: Vec3A::new(-4.0, 1.0, 0.0),
             radius: 1.0,
         },
-        Lambertian {
+        Lambert {
             color: rand_vec3a(0.0, 1.0) * rand_vec3a(0.0, 1.0),
         },
     );
@@ -103,22 +106,22 @@ pub fn random_scene(objects: &mut Objects, n: i16) {
 
 #[allow(dead_code)]
 pub fn default_scene(objects: &mut Objects) {
-    objects.add_lambertian_sphere(
+    objects.add_lambert_sphere(
         Sphere {
             origin: Vec3A::new(0.0, -1000.0, 0.0),
             radius: 1000.0,
         },
-        Lambertian {
+        Lambert {
             color: Vec3A::new(0.5, 0.5, 0.5),
         },
     );
 
-    objects.add_lambertian_sphere(
+    objects.add_lambert_sphere(
         Sphere {
             origin: Vec3A::new(-4.0, 1.0, 0.0),
             radius: 1.0,
         },
-        Lambertian {
+        Lambert {
             color: rand_vec3a(0.0, 1.0) * rand_vec3a(0.0, 1.0),
         },
     );
@@ -182,7 +185,13 @@ impl Image {
         image
     }
 
-    pub fn render_scene(width: usize, height: usize, samples_per_pixel: u16, depth: u16) -> Self {
+    pub fn render_scene(
+        width: usize,
+        height: usize,
+        samples_per_pixel: u16,
+        depth: u16,
+        objects: &mut Objects,
+    ) -> Self {
         let mut image = Image::new(width, height);
         const CM: f32 = 255.999; // color multiplier
 
@@ -207,18 +216,8 @@ impl Image {
             focal_length,
         );
 
-        let mut objects = Objects {
-            ledger: Vec::new(),
-            spheres: Vec::new(),
-            lambertians: Vec::new(),
-            metals: Vec::new(),
-            dielectrics: Vec::new(),
-        };
-
-        random_scene(&mut objects, 0);
-
-        let serialized = serde_json::to_string(&objects).unwrap();
-        println!("{}", serialized);
+        // let serialized = serde_json::to_string(&objects).unwrap();
+        // println!("{}", serialized);
         // let mut indices: Vec<usize> = vec![0; width * height];
         // indices
         //     .iter_mut()
@@ -271,31 +270,49 @@ impl Image {
         //     }
         // };
 
-        let pb = ProgressBar::new(samples_per_pixel as u64);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template("[{elapsed_precise} / {duration_precise}] {bar} {percent}%"),
-        );
-
         let mut pixels: Vec<Vec3A> = vec![Vec3A::new(0.0, 0.0, 0.0); width * height];
-        for _ in 0..samples_per_pixel {
-            pixels.par_iter_mut().enumerate().for_each(|(k, pixel)| {
-                let j = k / width;
-                let i = k - j * width;
-                let u = (i as f32 + rand::random::<f32>()) / w;
-                let v = 1.0 - (j as f32 + rand::random::<f32>()) / h;
-                let ray = Ray::new_from_camera(&camera, u, v);
-                *pixel += ray_color(&objects, &ray, depth);
-            });
-            pb.inc(1);
+        #[cfg(not(target_family = "wasm"))]
+        {
+            let pb = ProgressBar::new(samples_per_pixel as u64);
+            pb.set_style(
+                ProgressStyle::default_bar()
+                    .template("[{elapsed_precise} / {duration_precise}] {bar} {percent}%"),
+            );
+            for _ in 0..samples_per_pixel {
+                pixels.par_iter_mut().enumerate().for_each(|(k, pixel)| {
+                    let j = k / width;
+                    let i = k - j * width;
+                    let u = (i as f32 + rand::random::<f32>()) / w;
+                    let v = 1.0 - (j as f32 + rand::random::<f32>()) / h;
+                    let ray = Ray::new_from_camera(&camera, u, v);
+                    *pixel += ray_color(&objects, &ray, depth);
+                });
+                pb.inc(1);
+            }
+            pb.finish();
+            image.pixels = pixels
+                .par_iter_mut()
+                .map(|pixel| pixel.to_u8rgb(samples_per_pixel))
+                .collect::<Vec<[u8; 3]>>();
         }
-        pb.finish();
 
-        image.pixels = pixels
-            .par_iter_mut()
-            .map(|pixel| pixel.to_u8rgb(samples_per_pixel))
-            .collect::<Vec<[u8; 3]>>();
-
+        #[cfg(target_family = "wasm")]
+        {
+            for _ in 0..samples_per_pixel {
+                pixels.iter_mut().enumerate().for_each(|(k, pixel)| {
+                    let j = k / width;
+                    let i = k - j * width;
+                    let u = (i as f32 + rand::random::<f32>()) / w;
+                    let v = 1.0 - (j as f32 + rand::random::<f32>()) / h;
+                    let ray = Ray::new_from_camera(&camera, u, v);
+                    *pixel += ray_color(&objects, &ray, depth);
+                });
+            }
+            image.pixels = pixels
+                .iter_mut()
+                .map(|pixel| pixel.to_u8rgb(samples_per_pixel))
+                .collect::<Vec<[u8; 3]>>();
+        }
         image
     }
 
@@ -309,30 +326,30 @@ impl Image {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum Surface {
-    Lambertian,
+    Lambert,
     Metal,
     Dielectric,
 }
 
-#[derive(Serialize)]
-pub struct Lambertian {
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Lambert {
     color: Vec3A,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Metal {
     color: Vec3A,
     roughness: f32,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Dielectric {
     refractive_index: f32,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[allow(dead_code)]
 pub struct Object {
     surface: Surface,
@@ -340,19 +357,30 @@ pub struct Object {
     material_index: usize,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Objects {
-    ledger: Vec<Object>,
-    spheres: Vec<Sphere>,
-    lambertians: Vec<Lambertian>,
-    metals: Vec<Metal>,
-    dielectrics: Vec<Dielectric>,
+    pub ledger: Vec<Object>,
+    pub spheres: Vec<Sphere>,
+    pub lamberts: Vec<Lambert>,
+    pub metals: Vec<Metal>,
+    pub dielectrics: Vec<Dielectric>,
 }
 
 impl Objects {
+    #[allow(dead_code)]
+    pub fn new() -> Self {
+        Self {
+            ledger: Vec::new(),
+            spheres: Vec::new(),
+            lamberts: Vec::new(),
+            metals: Vec::new(),
+            dielectrics: Vec::new(),
+        }
+    }
+
     pub fn record(&mut self, surface: Surface) {
         let material_index = match surface {
-            Surface::Lambertian => self.lambertians.len(),
+            Surface::Lambert => self.lamberts.len(),
             Surface::Metal => self.metals.len(),
             Surface::Dielectric => self.dielectrics.len(),
         };
@@ -363,10 +391,10 @@ impl Objects {
         })
     }
 
-    pub fn add_lambertian_sphere(&mut self, sphere: Sphere, lambertian: Lambertian) {
-        self.record(Surface::Lambertian);
+    pub fn add_lambert_sphere(&mut self, sphere: Sphere, lambert: Lambert) {
+        self.record(Surface::Lambert);
         self.spheres.push(sphere);
-        self.lambertians.push(lambertian);
+        self.lamberts.push(lambert);
     }
 
     pub fn add_metal_sphere(&mut self, sphere: Sphere, metal: Metal) {
@@ -406,9 +434,9 @@ pub fn reflect(direction: Vec3A, normal: Vec3A) -> Vec3A {
     direction - 2.0 * direction.dot(normal) * normal
 }
 
-pub fn ray_color_lambertian(
+pub fn ray_color_lambert(
     intersection: &Intersection,
-    material: &Lambertian,
+    material: &Lambert,
     objects: &Objects,
     depth: u16,
 ) -> Vec3A {
@@ -504,9 +532,9 @@ pub fn ray_color(objects: &Objects, ray: &Ray, depth: u16) -> Vec3A {
     if hit_anything {
         let object = &objects.ledger[obj_index];
         match object.surface {
-            Surface::Lambertian => {
-                let material = &objects.lambertians[object.material_index];
-                ray_color_lambertian(&intersection, &material, &objects, depth)
+            Surface::Lambert => {
+                let material = &objects.lamberts[object.material_index];
+                ray_color_lambert(&intersection, &material, &objects, depth)
             }
             Surface::Metal => {
                 let material = &objects.metals[object.material_index];
@@ -641,7 +669,7 @@ impl Intersection {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Sphere {
     pub origin: Vec3A,
     pub radius: f32,

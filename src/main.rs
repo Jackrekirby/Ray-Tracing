@@ -15,7 +15,13 @@ fn main() {
     let height = 1080;
     let samples_per_pixel = 20;
     let depth = 10;
-    let image = raytracer::Image::render_scene(width, height, samples_per_pixel, depth);
+
+    let mut objects = raytracer::Objects::new();
+
+    raytracer::random_scene(&mut objects, 0);
+
+    let image =
+        raytracer::Image::render_scene(width, height, samples_per_pixel, depth, &mut objects);
 
     image.write();
     println!("Complete: {} s", now.elapsed().as_micros() as f32 / 1e6);
