@@ -21,17 +21,45 @@ const controls = {
     material: {
         name: 'mirror',
         id: '88d54e2a-a589-466d-af72-fcbd8e2508c8',
-        type: 'metal',
-        color: { r: 200, g: 200, b: 200 },
-        roughness: 0.5,
-        refractiveIndex: 1.5,
-        propensity: 0.5,
+        type: 'single',
+        material: 'metal',
+        single: {
+            color: { r: 200, g: 200, b: 200 },
+            roughness: 0.5,
+            refractiveIndex: 1.5,
+        },
+        range: [
+            {
+                color: { r: 200, g: 200, b: 200 },
+                roughness: 0.5,
+                refractiveIndex: 1.5,
+            },
+            {
+                color: { r: 200, g: 200, b: 200 },
+                roughness: 0.5,
+                refractiveIndex: 1.5,
+            }
+        ],
+        group: [
+            {
+                id: '88d54e2a-a589-466d-af72-fcbd8e2508c8',
+                propensity: 0.5,
+            },
+            {
+                id: '88d54e2a-a589-466d-af72-fcbd8e2508c8',
+                propensity: 0.5,
+            },
+            {
+                id: '88d54e2a-a589-466d-af72-fcbd8e2508c8',
+                propensity: 0.5,
+            }
+        ]
     }
 }
 
 const controllers = {
     shape: { list: { items: [] } },
-    material: { list: { items: [] }, tabs: { single: {}, range: {}, group: {} } },
+    material: { list: { items: [] }, single: {}, range: {}, group: {} },
 }
 
 const objects = {
@@ -39,28 +67,67 @@ const objects = {
         {
             id: '732a4348-6e70-47f7-96ea-adca184b6221',
             name: 'ground',
-            type: 'lambert',
-            color: [128, 128, 128],
+            type: 'single',
+            material: 'lambert',
+            color: { r: 128, g: 128, b: 128 },
         },
         {
             id: 'bd351f34-815e-42a8-b17d-da37c6db56dd',
             name: 'blue lambert',
-            type: 'lambert',
-            color: [128, 128, 255],
+            type: 'single',
+            material: 'lambert',
+            color: { r: 128, g: 128, b: 255 },
         },
         {
             id: '69eaca0e-ced1-4578-afe3-a89359d085aa',
             name: 'mirror',
-            type: 'metal',
-            color: [125, 125, 125],
+            type: 'single',
+            material: 'metal',
+            color: { r: 128, g: 128, b: 128 },
             roughness: 0.0,
         },
         {
             id: '93d3c46b-dbcc-40ef-8a1d-b3a39e329131',
             name: 'glass',
-            type: 'dielectric',
+            type: 'single',
+            material: 'dielectric',
             refractive_index: 1.5,
         },
+        {
+            id: '93d3c46b-dbcc-40ef-4463-b3a39e329131',
+            name: 'metal rainbow',
+            type: 'range',
+            material: 'metal',
+            range: [
+                {
+                    color: { r: 200, g: 200, b: 200 },
+                    roughness: 0.0,
+                },
+                {
+                    color: { r: 255, g: 255, b: 255 },
+                    roughness: 0.1,
+                }
+            ],
+        },
+        {
+            id: '2a357c2d-dbcc-40ef-4463-b3a39e329131',
+            name: 'random material',
+            type: 'group',
+            group: [
+                {
+                    id: '88d54e2a-a589-466d-af72-fcbd8e2508c8',
+                    propensity: 0.1,
+                },
+                {
+                    id: '88d54e2a-a589-466d-af72-fcbd8e2508c8',
+                    propensity: 0.5,
+                },
+                {
+                    id: '88d54e2a-a589-466d-af72-fcbd8e2508c8',
+                    propensity: 0.4,
+                }
+            ]
+        }
     ],
     shapes: [
         {
@@ -108,7 +175,11 @@ const objects = {
     const v = controls.shape
     const f = c.folder;
 
-    c.name = f.addInput(v, 'name');
+    c.name = f.addInput(v, 'name').on('change', (ev) => {
+        const shape = objects.shapes.find(shape => shape.id === controls.shape.id);
+        shape.name = controls.shape.name;
+        c.list.items.find(item => item.id === v.id).title = shape.name;
+    });
     c.id = f.addInput(v, 'id');
     c.shape = f.addInput(v, 'shape',
         { options: { sphere: 'sphere' } }
@@ -132,6 +203,10 @@ const objects = {
             }
         }),
         value: 'undefined',
+    }).on('change', (ev) => {
+        const shape = objects.shapes.find(shape => shape.id === controls.shape.id);
+        controls.shape.material = ev.value;
+        shape.material = ev.value;
     });
 
     c.duplicate = f.addButton({
@@ -206,147 +281,289 @@ const objects = {
     const v = controls.material
     const f = c.folder;
 
-    c.tabs.tabs = f.addTab({
-        pages: [
-            { title: 'Single' },
-            { title: 'Range' },
-            { title: 'Group' },
+    c.name = f.addInput(v, 'name');
+    c.id = f.addInput(v, 'id');
+
+    const changeType = (type) => {
+        const fnc = {
+            single: () => {
+                c.material.hidden = false;
+                c.single.color.hidden = false;
+                c.single.roughness.hidden = false;
+                c.single.refractiveIndex.hidden = false;
+
+                c.range.materials[0].folder.hidden = true;
+                c.range.materials[1].folder.hidden = true;
+                c.group.materials[0].folder.hidden = true;
+                c.group.materials[1].folder.hidden = true;
+                c.group.materials[2].folder.hidden = true;
+            },
+            range: () => {
+                c.material.hidden = false;
+                c.single.color.hidden = true;
+                c.single.roughness.hidden = true;
+                c.single.refractiveIndex.hidden = true;
+
+                c.range.materials[0].folder.hidden = false;
+                c.range.materials[1].folder.hidden = false;
+                c.group.materials[0].folder.hidden = true;
+                c.group.materials[1].folder.hidden = true;
+                c.group.materials[2].folder.hidden = true;
+            },
+            group: () => {
+                c.material.hidden = true;
+                c.single.color.hidden = true;
+                c.single.roughness.hidden = true;
+                c.single.refractiveIndex.hidden = true;
+
+                c.range.materials[0].folder.hidden = true;
+                c.range.materials[1].folder.hidden = true;
+                c.group.materials[0].folder.hidden = false;
+                c.group.materials[1].folder.hidden = false;
+                c.group.materials[2].folder.hidden = false;
+            },
+        }
+        fnc[type]();
+        c.type.value = type;
+        v.type = type;
+    }
+
+    c.type = f.addBlade({
+        view: 'list',
+        label: 'type',
+        options: [
+            {
+                text: 'single',
+                value: 'single',
+            },
+            {
+                text: 'range',
+                value: 'range',
+            },
+            {
+                text: 'group',
+                value: 'group',
+            }
         ],
-    });
+        value: 'undefined',
+    }).on('change', ev => { changeType(ev.value); });
 
-    c.tabs.single.tab = c.tabs.tabs.pages[0];
-    c.tabs.range.tab = c.tabs.tabs.pages[1];
-    c.tabs.group.tab = c.tabs.tabs.pages[2];
 
-    {
-        const s = c.tabs.single;
-        const t = s.tab;
-        s.name = t.addInput(v, 'name');
-        s.id = t.addInput(v, 'id');
-        s.type = t.addInput(
-            v, 'type',
-            { options: { lambert: 'lambert', metal: 'metal', dielectric: 'dielectric' } }
-        ).on('change', ev => {
-            const fnc = {
+    const changeMaterial = (type, material) => {
+        const fnc = {
+            single: {
                 lambert: () => {
-                    s.color.hidden = false;
-                    s.roughness.hidden = true;
-                    s.refractiveIndex.hidden = true;
+                    c.single.color.hidden = false;
+                    c.single.roughness.hidden = true;
+                    c.single.refractiveIndex.hidden = true;
                 },
                 metal: () => {
-                    s.color.hidden = false;
-                    s.roughness.hidden = false;
-                    s.refractiveIndex.hidden = true;
+                    c.single.color.hidden = false;
+                    c.single.roughness.hidden = false;
+                    c.single.refractiveIndex.hidden = true;
                 },
                 dielectric: () => {
-                    s.color.hidden = true;
-                    s.roughness.hidden = true;
-                    s.refractiveIndex.hidden = false;
+                    c.single.color.hidden = true;
+                    c.single.roughness.hidden = true;
+                    c.single.refractiveIndex.hidden = false;
+                },
+            },
+            range: {
+                lambert: () => {
+                    c.range.materials[0].color.hidden = false;
+                    c.range.materials[0].roughness.hidden = true;
+                    c.range.materials[0].refractiveIndex.hidden = true;
+                    c.range.materials[1].color.hidden = false;
+                    c.range.materials[1].roughness.hidden = true;
+                    c.range.materials[1].refractiveIndex.hidden = true;
+                },
+                metal: () => {
+                    c.range.materials[0].color.hidden = false;
+                    c.range.materials[0].roughness.hidden = false;
+                    c.range.materials[0].refractiveIndex.hidden = true;
+                    c.range.materials[1].color.hidden = false;
+                    c.range.materials[1].roughness.hidden = false;
+                    c.range.materials[1].refractiveIndex.hidden = true;
+                },
+                dielectric: () => {
+                    c.range.materials[0].color.hidden = true;
+                    c.range.materials[0].roughness.hidden = true;
+                    c.range.materials[0].refractiveIndex.hidden = false;
+                    c.range.materials[1].color.hidden = true;
+                    c.range.materials[1].roughness.hidden = true;
+                    c.range.materials[1].refractiveIndex.hidden = false;
                 },
             }
-            fnc[ev.value]();
+        }
+        fnc[type][material]();
+        v.material = material;
+        c.material.value = material;
+    }
+
+    c.material = f.addBlade({
+        view: 'list',
+        label: 'material',
+        options: [
+            {
+                text: 'lambert',
+                value: 'lambert',
+            },
+            {
+                text: 'metal',
+                value: 'metal',
+            },
+            {
+                text: 'dielectric',
+                value: 'dielectric',
+            }
+        ],
+        value: 'undefined',
+    }).on('change', ev => { changeMaterial(v.type, ev.value) });
+
+    c.single.color = f.addInput(v.single, 'color');
+
+    c.single.roughness = f.addInput(v.single, 'roughness', {
+        min: 0.0,
+        max: 1.0,
+        step: 0.01,
+    });
+    c.single.refractiveIndex = f.addInput(v.single, 'refractiveIndex', {
+        label: 'refraction',
+        min: 1.0,
+        max: 5.0,
+        step: 0.01,
+    });
+
+    c.range.materials = [];
+    const rangeNames = ['Material A', 'Material B'];
+    rangeNames.forEach((name, i) => {
+        const a = {};
+        a.folder = f.addFolder({
+            title: name,
+            expanded: true,
         });
-
-        s.color = t.addInput(controls.material, 'color');
-
-        s.roughness = t.addInput(controls.material, 'roughness', {
+        a.color = a.folder.addInput(v.range[i], 'color');
+        a.roughness = a.folder.addInput(v.range[i], 'roughness', {
             min: 0.0,
             max: 1.0,
             step: 0.01,
         });
-        s.refractiveIndex = t.addInput(controls.material, 'refractiveIndex', {
+        a.refractiveIndex = a.folder.addInput(v.range[i], 'refractiveIndex', {
             label: 'refraction',
             min: 1.0,
             max: 5.0,
             step: 0.01,
         });
-    }
+        c.range.materials.push(a);
+    });
 
-    {
-        const s = c.tabs.range;
-        const t = s.tab;
-
-        s.name = t.addInput(controls.material, 'name');
-        s.id = t.addInput(controls.material, 'id');
-        s.type = t.addInput(
-            v, 'type',
-            { options: { lambert: 'lambert', metal: 'metal', dielectric: 'dielectric' } }
-        );
-        s.materials = [];
-        const names = ['Material A', 'Material B'];
-        names.forEach(name => {
-            const a = {};
-            a.folder = t.addFolder({
-                title: name,
-                expanded: true,
-            });
-
-            a.color = a.folder.addInput(controls.material, 'color');
-            a.roughness = a.folder.addInput(controls.material, 'roughness', {
-                min: 0.0,
-                max: 1.0,
-                step: 0.01,
-            });
-            a.refractiveIndex = a.folder.addInput(controls.material, 'refractiveIndex', {
-                label: 'refraction',
-                min: 1.0,
-                max: 5.0,
-                step: 0.01,
-            });
-            s.materials.push(a);
+    c.group.materials = [];
+    const groupNames = ['Material A', 'Material B', 'Material C'];
+    groupNames.forEach((name, i) => {
+        const a = {};
+        a.folder = f.addFolder({
+            title: name,
+            expanded: true,
         });
-    }
 
-    {
-        const s = c.tabs.group;
-        const t = s.tab;
+        a.id = a.folder.addBlade({
+            view: 'list',
+            label: 'name',
+            options: objects.materials.map(material => {
+                return {
+                    text: material.name,
+                    value: material.id
+                }
+            }),
+            value: 'undefined',
+        }).on('change', ev => { });
 
-        s.name = t.addInput(controls.material, 'name');
-        s.id = t.addInput(controls.material, 'id');
-
-        s.materials = [];
-        const names = ['Material A', 'Material B', 'Material C'];
-        names.forEach(name => {
-            const a = {};
-            a.folder = t.addFolder({
-                title: name,
-                expanded: true,
-            });
-
-            a.color = a.folder.addInput(
-                controls.material, 'name',
-                { options: { mirror: 'dc84976c-27ce-41d6-916a-40d4778fda2c' } }
-            );
-
-            a.propensity = a.folder.addInput(controls.material, 'propensity', {
-                min: 0.0,
-                max: 1.0,
-                step: 0.01,
-            });
-            s.materials.push(a);
+        a.propensity = a.folder.addInput(v.group[i], 'propensity', {
+            min: 0.0,
+            max: 1.0,
+            step: 0.01,
         });
+        c.group.materials.push(a);
+    });
+
+    c.duplicate = f.addButton({
+        title: 'duplicate',
+    });
+    c.delete = f.addButton({
+        title: 'delete',
+    });
+
+    // MATERIAL LIST FOLDER
+    controllers.material.list.folder = pane.addFolder({
+        title: 'Material List',
+        expanded: true,
+    });
+
+    const selectMaterial = material => {
+        v.name = material.name;
+        v.id = material.id;
+        v.type = material.type;
+
+        const fnc2 = {
+            lambert: (a, material) => {
+                a.color = material.color;
+            },
+            metal: (a, material) => {
+                a.color = material.color;
+                a.roughness = material.roughness;
+            },
+            dielectric: (a, material) => {
+                a.refractiveIndex = material.refractiveIndex;
+            },
+        }
+
+        const fnc = {
+            single: () => {
+                v.material = material.material;
+                fnc2[v.material](v.single, material);
+                changeMaterial(v.type, v.material);
+            },
+            range: () => {
+                v.material = material.material;
+                fnc2[v.material](v.range[0], material.range[0]);
+                fnc2[v.material](v.range[1], material.range[1]);
+                changeMaterial(v.type, v.material);
+            },
+            group: () => {
+                for (let i = 0; i < 3; i++) {
+                    v.group[i].id = material.group[i].id;
+                    v.group[i].propensity = material.group[i].propensity;
+                }
+            }
+        }
+
+        changeType(v.type);
+        fnc[v.type]();
+        pane.refresh();
     }
+
+    const addMaterialToList = material => {
+        const item = c.list.folder.addButton({
+            title: material.name
+        }).on('click', () => selectMaterial(material));
+        item.id = material.id;
+        c.list.items.push(item);
+    }
+
+    objects.materials.forEach(material => addMaterialToList(material));
+    selectMaterial(objects.materials[0]);
 }
 
+// controllers.material.list.folder = pane.addFolder({
+//     title: 'Material List',
+//     expanded: true,
+// });
+
+// objects.materials.forEach(material => {
+//     controllers.material.list.items.push(controllers.material.list.folder.addButton({
+//         title: material.name,
+//     }));
+// });
 
 console.log(controllers);
-
-controllers.material.duplicate = controllers.material.folder.addButton({
-    title: 'duplicate',
-});
-controllers.material.delete = controllers.material.folder.addButton({
-    title: 'delete',
-});
-
-controllers.material.list.folder = pane.addFolder({
-    title: 'Material List',
-    expanded: true,
-});
-
-
-
-objects.materials.forEach(material => {
-    controllers.material.list.items.push(controllers.material.list.folder.addButton({
-        title: material.name,
-    }));
-})
+console.log(controls);

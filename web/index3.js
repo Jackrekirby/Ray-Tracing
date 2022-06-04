@@ -610,6 +610,7 @@ function call_raytracer() {
     const samples_per_pixel = 100;
     const depth = 50;
     const newObjects = formatObjects();
+    console.log(JSON.stringify(newObjects));
 
     pCanvas.user.pixels = run_raytracer(
         pCanvas.user.width,
