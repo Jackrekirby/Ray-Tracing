@@ -1,14 +1,14 @@
 const worker = new Worker('./worker.js', { type: 'module' });
 import * as THREE from 'three';
 
-const stats = new Stats();
+// const stats = new Stats();
 
 
 // Stats.begin();
 
-console.log(stats);
+// console.log(stats);
 // aaaa.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
-document.getElementById('stats').appendChild(stats.domElement);
+// document.getElementById('stats').appendChild(stats.domElement);
 
 worker.init = false;
 worker.postMessage({ action: 'init' });
@@ -17,7 +17,7 @@ worker.onmessage = (e) => {
     const fnc = {
         'init': () => {
             worker.init = true;
-            console.log('worker initiated');
+            // console.log('worker initiated');
         },
         render: () => {
             const T = scene.image.elapsedSamplesPerPixel;
@@ -182,7 +182,7 @@ const gui = {
                         }
                     },
                     onGuiBuilt: () => {
-                        flatGui.shape.list.tp.value = objects.shapes[3].id;
+                        flatGui.shape.list.tp.value = objects.shapes[0].id;
                     }
                 },
                 {
@@ -233,7 +233,7 @@ const gui = {
                 {
                     uname: 'shape.origin',
                     type: 'input',
-                    value: { x: 0.12, y: 3.45, z: 6.78 },
+                    value: objects.shapes[0].origin,
                     options: {
                         label: 'origin',
                     },
@@ -245,7 +245,7 @@ const gui = {
                 {
                     uname: 'shape.radius',
                     type: 'input',
-                    value: 1.0,
+                    value: objects.shapes[0].radius,
                     options: {
                         label: 'radius',
                         step: 0.01,
@@ -380,7 +380,7 @@ const gui = {
                         }
                     },
                     onGuiBuilt: () => {
-                        flatGui.materialList.tp.value = objects.materials[1].id;
+                        flatGui.materialList.tp.value = objects.materials[0].id;
                     }
                 },
                 {
@@ -463,6 +463,10 @@ const gui = {
                         flatGui.surface.setDependencyVisibility(e.value);
                         material.surface = e.value;
                     },
+                    onGuiBuilt: () => {
+                        const material = flatGui.materialList.material;
+                        flatGui.surface.setDependencyVisibility(material.surface);
+                    }
                 },
                 {
                     uname: 'color',
@@ -1026,13 +1030,15 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
     scene3.add(light);
     // scene3.add(directionalLight);
 
-    function animate() {
-        requestAnimationFrame(animate);
-        renderer.render(scene3, camera);
-        stats.update();
-    };
+    // function animate() {
+    //     stats.update();
+    // };
 
-    animate();
+
+    // requestAnimationFrame(animate);
+    renderer.render(scene3, camera);
+
+    // animate();
 }
 
 let lastObjects = JSON.stringify(objects);
@@ -1045,6 +1051,8 @@ setInterval(
             objects.shapes.forEach((shape) => {
                 addShapeToScene(shape);
             });
+            // requestAnimationFrame(animate);
+            renderer.render(scene3, camera);
             lastObjects = JSON.stringify(objects);
         }
     }, 1000
