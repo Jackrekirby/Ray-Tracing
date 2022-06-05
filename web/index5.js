@@ -1,5 +1,42 @@
-import init, { run_raytracer } from "../pkg/raytracer_lib.js";
-await init()
+const worker = new Worker('worker.js', { type: 'module' });
+
+worker.init = false;
+worker.postMessage({ action: 'init' });
+
+worker.onmessage = (e) => {
+    const fnc = {
+        'init': () => {
+            worker.init = true;
+        },
+        render: () => {
+            const T = scene.image.elapsedSamplesPerPixel;
+            const t = scene.image.samplesPerPixel;
+            if (T == 0) {
+                pCanvas.user.pixels = e.data.output;
+            } else {
+                pCanvas.user.pixels = pCanvas.user.pixels.map((pixel, i) => {
+                    // console.log(pixel, i);
+                    const [r1, g1, b1] = pixel;
+                    const [r2, g2, b2] = e.data.output[i];
+                    const r = (r1 * T + r2 * t) / (T + t);
+                    const g = (g1 * T + g2 * t) / (T + t);
+                    const b = (b1 * T + b2 * t) / (T + t);
+                    return [r, g, b];
+                });
+            }
+
+            // console.log(pCanvas.user.pixels);
+            scene.image.elapsedSamplesPerPixel += scene.image.samplesPerPixel;
+
+            // pCanvas.user.pixels = e.data.output;
+            pCanvas.draw();
+
+            const t1 = performance.now();
+            console.log(`Complete: ${((t1 - e.data.start) / 1000).toPrecision(3)} s`);
+        }
+    }
+    fnc[e.data.action]();
+}
 
 const newId = () => uuid.v4();
 // console.log(newId());
@@ -74,6 +111,17 @@ objects.materials.sort((a, b) => {
     if (a.name > b.name) { return 1; }
     return 0;
 });
+
+const scene = {
+    image: {
+        width: 256,
+        height: 256,
+        postScale: 2,
+        samplesPerPixel: 30,
+        elapsedSamplesPerPixel: 0,
+        rayDepth: 30,
+    }
+}
 
 const flatGui = {};
 const gui = {
@@ -516,6 +564,79 @@ const gui = {
 
         },
         {
+            uname: 'image.folder',
+            type: 'folder',
+            options: {
+                title: 'Image Editor',
+                expanded: true,
+            },
+            update: (sizeChanged) => {
+                clearTimeout(flatGui.image.folder.timeout);
+                flatGui.image.folder.timeout = setTimeout(() => {
+                    if (sizeChanged) {
+                        pCanvas.user.pixels = new Array(scene.image.width * scene.image.height).
+                            fill([187, 188, 196]);
+                    }
+                    pCanvas.resizeCanvas(scene.image.width * scene.image.postScale,
+                        scene.image.height * scene.image.postScale);
+                }, 1000)
+            },
+            children: [
+                {
+                    uname: 'image.size',
+                    type: 'input',
+                    value: { x: scene.image.width, y: scene.image.height },
+                    options: {
+                        label: 'size',
+                        x: { min: 0, max: 3840, step: 1 },
+                        y: { min: 0, max: 2160, step: 1 },
+                    },
+                    onChange: (e) => {
+                        scene.image.width = e.value.x;
+                        scene.image.height = e.value.y;
+                        flatGui.image.folder.update(true);
+                    },
+                },
+                {
+                    uname: 'image.rayDepth',
+                    type: 'input',
+                    value: scene.image.rayDepth,
+                    options: {
+                        label: 'ray depth',
+                        min: 1, max: 500, step: 1,
+                    },
+                    onChange: (e) => {
+                        scene.image.rayDepth = e.value;
+                    },
+                },
+                {
+                    uname: 'image.samplesPerPixel',
+                    type: 'input',
+                    value: scene.image.samplesPerPixel,
+                    options: {
+                        label: 'rays/pixel',
+                        min: 1, max: 500, step: 1,
+                    },
+                    onChange: (e) => {
+                        scene.image.samplesPerPixel = e.value;
+                    },
+                },
+                {
+                    uname: 'image.postScale',
+                    type: 'input',
+                    value: scene.image.postScale,
+                    options: {
+                        label: 'post scale',
+                        min: 1, max: 5, step: 1,
+                    },
+                    onChange: (e) => {
+                        scene.image.postScale = e.value;
+                        flatGui.image.folder.update(false);
+                    },
+                },
+            ],
+        },
+        {
             uname: 'log',
             type: 'button',
             options: {
@@ -525,6 +646,19 @@ const gui = {
                 console.log('gui', gui);
                 console.log('flatgui', flatGui);
                 console.log('objects', objects);
+            }
+        },
+        {
+            uname: 'clear',
+            type: 'button',
+            options: {
+                title: 'clear',
+            },
+            onClick: (e) => {
+                pCanvas.user.pixels = new Array(scene.image.width * scene.image.height).
+                    fill([187, 188, 196]);
+                scene.image.elapsedSamplesPerPixel = 0;
+                pCanvas.draw();
             }
         },
         {
@@ -539,11 +673,6 @@ const gui = {
         }
     ]
 };
-
-
-const pane = new Tweakpane.Pane({
-    container: document.getElementById('gui'),
-});
 
 const handle = (object, parent) => {
     const handleChildren = () => object.children.forEach(child => handle(child, object));
@@ -684,31 +813,29 @@ function formatObjects() {
 
 const pCanvasFnc = (p) => {
     p.user = {
-        scale: 2,
-        width: 256 * 1.25,
-        height: 256,
         pixels: [],
     }
 
-
     p.setup = () => {
         p.createCanvas(
-            p.user.width * p.user.scale,
-            p.user.height * p.user.scale
+            Math.floor(scene.image.width * scene.image.postScale),
+            Math.floor(scene.image.height * scene.image.postScale),
         );
 
-        p.user.pixels = new Array(p.user.width * p.user.height).fill([125, 125, 125]),
+        p.user.pixels = new Array(scene.image.width * scene.image.height).
+            fill([187, 188, 196]);
 
-            p.noStroke();
+        p.noStroke();
         p.noLoop();
     }
 
     p.draw = () => {
-        for (let j = 0; j < p.user.height; j++) {
-            for (let i = 0; i < p.user.width; i++) {
-                const [r, g, b] = p.user.pixels[i + j * p.user.width];
+        for (let j = 0; j < scene.image.height; j++) {
+            for (let i = 0; i < scene.image.width; i++) {
+                const [r, g, b] = p.user.pixels[i + j * scene.image.width];
                 p.fill(r, g, b);
-                p.rect(i * p.user.scale, j * p.user.scale, p.user.scale, p.user.scale);
+                p.rect(i * scene.image.postScale, j * scene.image.postScale,
+                    scene.image.postScale, scene.image.postScale);
             }
         }
     }
@@ -717,25 +844,24 @@ const pCanvasFnc = (p) => {
 let pCanvas = new p5(pCanvasFnc, 'canvas');
 
 function call_raytracer() {
-    const t0 = performance.now();
-
-    const samples_per_pixel = 100;
-    const depth = 50;
     const newObjects = formatObjects();
     // console.log(JSON.stringify(newObjects));
 
-    pCanvas.user.pixels = run_raytracer(
-        pCanvas.user.width,
-        pCanvas.user.height,
-        samples_per_pixel,
-        depth,
-        newObjects
-    );
+    if (worker.init) {
+        worker.postMessage({
+            action: 'render',
+            start: performance.now(),
+            arguments: {
+                width: scene.image.width,
+                height: scene.image.height,
+                samples: scene.image.samplesPerPixel,
+                depth: scene.image.rayDepth,
+                objects: newObjects
+            }
+        })
+    } else {
+        console.error('worker not initiated');
+    }
 
-    pCanvas.draw();
-    // console.log(data);
-    // console.log(pCanvas);
 
-    const t1 = performance.now();
-    console.log(`Complete: ${(t1 - t0) / 1000} s`);
 }

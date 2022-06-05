@@ -6,15 +6,31 @@
 
 body {
   display: flex;
-  padding-left: 2rem;
-  justify-content: left;
+  /* padding-left: 2rem; */
+  justify-content: space-between;
   align-items: center;
   height: 100%;
-  background-color: black;
+  width: 100%;
+  background-color: red;
   overflow: hidden;
 }
 
-.c select {
+#canvas-holder {
+  display: flex;
+  flex-grow: 1;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  width: calc(100% - 17rem);
+  background-color: 28292e;
+  overflow: hidden;
+}
+
+#canvas {
+  border: 1px solid white;
+}
+
+/* .c select {
   background: #303030;
   outline: none;
   color: rgb(255, 255, 255);
@@ -23,14 +39,14 @@ body {
   padding: 3px;
   width: 100%;
   float: right;
-}
+} */
 
 #gui {
   width: 17rem;
   height: 100%;
-  position: absolute;
+  /* position: absolute;
   top: 0;
-  right: 0;
+  right: 0; */
   overflow-y: overlay;
   padding-right: 8px;
   background-color: #3e3f44;
