@@ -11,11 +11,12 @@ body {
   align-items: center;
   height: 100%;
   width: 100%;
-  background-color: red;
+  background-color: #3e3f44;
   overflow: hidden;
 }
 
 #canvas-holder {
+  position: relative;
   display: flex;
   flex-grow: 1;
   justify-content: center;
@@ -26,8 +27,28 @@ body {
   overflow: hidden;
 }
 
-#canvas {
+/* #canvas {
+  position: relative;
   border: 1px solid white;
+  justify-content: center;
+  align-items: center;
+
+} */
+
+#p5-canvas {
+  display: inherit;
+}
+
+#three-canvas {
+  display: inherit;
+}
+
+#stats {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  opacity: 0.5;
 }
 
 #version {

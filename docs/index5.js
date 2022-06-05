@@ -1,6 +1,14 @@
 const worker = new Worker('./worker.js', { type: 'module' });
+import * as THREE from 'three';
 
-console.log('url', window.location);
+const stats = new Stats();
+
+
+// Stats.begin();
+
+console.log(stats);
+// aaaa.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
+document.getElementById('stats').appendChild(stats.domElement);
 
 worker.init = false;
 worker.postMessage({ action: 'init' });
@@ -33,6 +41,7 @@ worker.onmessage = (e) => {
 
             // pCanvas.user.pixels = e.data.output;
             pCanvas.draw();
+            flatGui.toggleView.viewP5();
 
             const t1 = performance.now();
             console.log(`Complete: ${((t1 - e.data.start) / 1000).toPrecision(3)} s`);
@@ -582,6 +591,11 @@ const gui = {
                     }
                     pCanvas.resizeCanvas(scene.image.width * scene.image.postScale,
                         scene.image.height * scene.image.postScale);
+
+                    renderer.setSize(scene.image.width * scene.image.postScale,
+                        scene.image.height * scene.image.postScale);
+                    camera.aspect = scene.image.width / scene.image.height;
+                    camera.updateProjectionMatrix();
                 }, 1000)
             },
             children: [
@@ -640,39 +654,102 @@ const gui = {
             ],
         },
         {
-            uname: 'log',
-            type: 'button',
+            uname: 'action.folder',
+            type: 'folder',
             options: {
-                title: 'log',
+                title: 'Actions',
+                expanded: true,
             },
-            onClick: (e) => {
-                console.log('gui', gui);
-                console.log('flatgui', flatGui);
-                console.log('objects', objects);
-            }
-        },
-        {
-            uname: 'clear',
-            type: 'button',
-            options: {
-                title: 'clear',
-            },
-            onClick: (e) => {
-                pCanvas.user.pixels = new Array(scene.image.width * scene.image.height).
-                    fill([187, 188, 196]);
-                scene.image.elapsedSamplesPerPixel = 0;
-                pCanvas.draw();
-            }
-        },
-        {
-            uname: 'render',
-            type: 'button',
-            options: {
-                title: 'render',
-            },
-            onClick: (e) => {
-                call_raytracer();
-            }
+            children: [
+                {
+                    uname: 'clear',
+                    type: 'button',
+                    options: {
+                        title: 'clear',
+                    },
+                    onClick: (e) => {
+                        pCanvas.user.pixels = new Array(scene.image.width * scene.image.height).
+                            fill([187, 188, 196]);
+                        scene.image.elapsedSamplesPerPixel = 0;
+                        pCanvas.draw();
+                    }
+                },
+                {
+                    uname: 'render',
+                    type: 'button',
+                    options: {
+                        title: 'render',
+                    },
+                    onClick: (e) => {
+                        call_raytracer();
+                    }
+                },
+                {
+                    uname: 'save',
+                    type: 'button',
+                    options: {
+                        title: 'save',
+                    },
+                    onClick: (e) => {
+                        pCanvas.download();
+                    }
+                },
+                {
+                    uname: 'export',
+                    type: 'button',
+                    options: {
+                        title: 'export',
+                    },
+                    onClick: (e) => {
+                        pCanvas.export();
+                    }
+                },
+                {
+                    uname: 'toggleView',
+                    type: 'button',
+                    options: {
+                        title: 'toggle view',
+                    },
+                    onClick: (e) => {
+                        const a = document.getElementById('three-canvas');
+                        const b = document.getElementById('p5-canvas');
+
+                        if (a.style.display === 'none') {
+                            a.style.display = '';
+                            b.style.display = 'none';
+                        } else {
+                            a.style.display = 'none';
+                            b.style.display = '';
+                        }
+                    },
+                    viewP5: () => {
+                        const a = document.getElementById('three-canvas');
+                        const b = document.getElementById('p5-canvas');
+                        a.style.display = 'none';
+                        b.style.display = '';
+                    },
+                    viewThree: () => {
+                        const a = document.getElementById('three-canvas');
+                        const b = document.getElementById('p5-canvas');
+                        a.style.display = '';
+                        b.style.display = 'none';
+                    }
+
+                },
+                {
+                    uname: 'log',
+                    type: 'button',
+                    options: {
+                        title: 'log',
+                    },
+                    onClick: (e) => {
+                        console.log('gui', gui);
+                        console.log('flatgui', flatGui);
+                        console.log('objects', objects);
+                        console.log('scene', scene3);
+                    }
+                },
+            ],
         }
     ]
 };
@@ -832,6 +909,18 @@ const pCanvasFnc = (p) => {
         p.noLoop();
     }
 
+    p.download = () => {
+        p.save("image.png");
+    }
+
+    p.export = () => {
+        const json = {
+            objects: formatObjects(),
+            ...scene,
+        }
+        p.save(json, 'scene.json');
+    }
+
     p.draw = () => {
         for (let j = 0; j < scene.image.height; j++) {
             for (let i = 0; i < scene.image.width; i++) {
@@ -844,7 +933,7 @@ const pCanvasFnc = (p) => {
     }
 }
 
-let pCanvas = new p5(pCanvasFnc, 'canvas');
+let pCanvas = new p5(pCanvasFnc, 'p5-canvas');
 
 function call_raytracer() {
     const newObjects = formatObjects();
@@ -865,6 +954,100 @@ function call_raytracer() {
     } else {
         console.error('worker not initiated');
     }
-
-
 }
+
+const addShapeToScene = (shape) => {
+    const fnc = {
+        sphere: () => {
+            const geometry = new THREE.IcosahedronGeometry(shape.radius, 50);
+            const m = objects.materials.find(
+                material => material.id === shape.material);
+
+            let material;
+            const fnc = {
+                lambert: () => {
+                    const color = new THREE.Color(m.color.r / 255, m.color.g / 255, m.color.b / 255);
+                    const options = { color: color };
+                    material = new THREE.MeshStandardMaterial(options);
+                },
+                metal: () => {
+                    const color = new THREE.Color(m.color.r / 255, m.color.g / 255, m.color.b / 255);
+                    const options = { color: color };
+                    material = new THREE.MeshStandardMaterial(options);
+                },
+                dielectric: () => {
+                    material = new THREE.MeshPhysicalMaterial({
+                        roughness: 0,
+                        transmission: 1,
+                        thickness: 1000,
+                    });
+                }
+            }
+
+            fnc[m.surface]();
+            const sphere = new THREE.Mesh(geometry, material);
+            sphere.frustumCulled = true;
+            sphere.uuid = shape.id;
+            sphere.position.set(shape.origin.x, shape.origin.y, shape.origin.z);
+
+            group.add(sphere);
+        }
+    }
+    fnc[shape.type]();
+}
+
+const scene3 = new THREE.Scene();
+const group = new THREE.Group();
+const camera = new THREE.PerspectiveCamera(20,
+    scene.image.width / scene.image.height, 0.1, 1000);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+{
+
+
+    camera.position.set(13.0, 2.0, 3.0);
+    camera.lookAt(0.0, 0.0, 0.0);
+
+
+
+    renderer.setSize(scene.image.width * scene.image.postScale,
+        scene.image.height * scene.image.postScale);
+    document.getElementById('three-canvas').appendChild(renderer.domElement);
+
+    renderer.setClearColor(0xdeecff, 1);
+
+    scene3.add(group);
+    objects.shapes.forEach((shape) => {
+        addShapeToScene(shape);
+    })
+
+    // const directionalLight = new THREE.DirectionalLight(0xffffff, 0.2);
+    const light = new THREE.AmbientLight("rgb(255, 255, 255)", 1.1); // soft white light
+    scene3.add(light);
+    // scene3.add(directionalLight);
+
+    function animate() {
+        requestAnimationFrame(animate);
+        renderer.render(scene3, camera);
+        stats.update();
+    };
+
+    animate();
+}
+
+let lastObjects = JSON.stringify(objects);
+
+setInterval(
+    () => {
+        if (lastObjects !== JSON.stringify(objects)) {
+            console.log('redraw');
+            group.children = [];
+            objects.shapes.forEach((shape) => {
+                addShapeToScene(shape);
+            });
+            lastObjects = JSON.stringify(objects);
+        }
+    }, 1000
+);
+
+flatGui.toggleView.viewThree();
