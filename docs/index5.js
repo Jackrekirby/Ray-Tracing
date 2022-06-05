@@ -1,5 +1,7 @@
 const worker = new Worker('./worker.js', { type: 'module' });
 
+console.log('url', window.location);
+
 worker.init = false;
 worker.postMessage({ action: 'init' });
 
