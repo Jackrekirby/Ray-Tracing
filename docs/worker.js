@@ -1,4 +1,4 @@
-import init, { run_raytracer } from "../pkg/raytracer_lib.js";
+import init, { run_raytracer } from "./raytracer_lib.js";
 
 onmessage = function (e) {
     console.log('worker');
