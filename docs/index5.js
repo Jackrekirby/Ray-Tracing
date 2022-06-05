@@ -1,6 +1,5 @@
-const worker = new Worker('worker.js', { type: 'module' });
+const worker = new Worker('./worker.js', { type: 'module' });
 
-console.log('version 0.1');
 worker.init = false;
 worker.postMessage({ action: 'init' });
 
