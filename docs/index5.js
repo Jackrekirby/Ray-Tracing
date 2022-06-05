@@ -9,6 +9,7 @@ worker.onmessage = (e) => {
     const fnc = {
         'init': () => {
             worker.init = true;
+            console.log('worker initiated');
         },
         render: () => {
             const T = scene.image.elapsedSamplesPerPixel;
