@@ -132,6 +132,14 @@ const scene = {
         samplesPerPixel: 30,
         elapsedSamplesPerPixel: 0,
         rayDepth: 30,
+    },
+    camera: {
+        position: { x: 13.0, y: 2.0, z: 3.0 },
+        lookAt: { x: 0.0, y: 0.0, z: 0.0 },
+        vup: { x: 0.0, y: 1.0, z: 0.0 },
+        vfov: 20.0,
+        aperture: 0.1,
+        focalLength: 10.0,
     }
 }
 
@@ -658,6 +666,108 @@ const gui = {
             ],
         },
         {
+            uname: 'camera.folder',
+            type: 'folder',
+            options: {
+                title: 'Camera Editor',
+                expanded: true,
+            },
+            children: [
+                {
+                    uname: 'camera.position',
+                    type: 'input',
+                    value: scene.camera.position,
+                    options: {
+                        label: 'position',
+                        x: { step: 0.01 },
+                        y: { step: 0.01 },
+                        z: { step: 0.01 },
+                    },
+                    onChange: (e) => {
+                        scene.camera.position = e.value;
+                        camera.position.set(scene.camera.position.x, scene.camera.position.y, scene.camera.position.z);
+                        camera.lookAt(scene.camera.lookAt.x, scene.camera.lookAt.y, scene.camera.lookAt.z);
+                        camera.updateProjectionMatrix();
+                    },
+                },
+                {
+                    uname: 'camera.lookAt',
+                    type: 'input',
+                    value: scene.camera.lookAt,
+                    options: {
+                        label: 'look at',
+                        x: { step: 0.01 },
+                        y: { step: 0.01 },
+                        z: { step: 0.01 },
+                    },
+                    onChange: (e) => {
+                        scene.camera.lookAt = e.value;
+                        camera.position.set(scene.camera.position.x, scene.camera.position.y, scene.camera.position.z);
+                        camera.lookAt(scene.camera.lookAt.x, scene.camera.lookAt.y, scene.camera.lookAt.z);
+                        camera.updateProjectionMatrix();
+                    },
+                },
+                {
+                    uname: 'camera.vup',
+                    type: 'input',
+                    value: scene.camera.vup,
+                    options: {
+                        label: 'v-up',
+                        x: { step: 0.01 },
+                        y: { step: 0.01 },
+                        z: { step: 0.01 },
+                    },
+                    onChange: (e) => {
+                        scene.camera.vup = e.value;
+                    },
+                },
+                {
+                    uname: 'camera.vfov',
+                    type: 'input',
+                    value: scene.camera.vfov,
+                    options: {
+                        label: 'v-fov',
+                        min: 0,
+                        max: 360,
+                        step: 1,
+                    },
+                    onChange: (e) => {
+                        scene.camera.vfov = e.value;
+                        camera.fov = scene.camera.vfov;
+                        camera.updateProjectionMatrix();
+                    },
+                },
+                {
+                    uname: 'camera.aperture',
+                    type: 'input',
+                    value: scene.camera.aperture,
+                    options: {
+                        label: 'aperture',
+                        min: 0,
+                        max: 50,
+                        step: 0.01,
+                    },
+                    onChange: (e) => {
+                        scene.camera.aperture = e.value;
+                    },
+                },
+                {
+                    uname: 'camera.focalLength',
+                    type: 'input',
+                    value: scene.camera.focalLength,
+                    options: {
+                        label: 'focal len',
+                        min: 0,
+                        max: 100,
+                        step: 1,
+                    },
+                    onChange: (e) => {
+                        scene.camera.focalLength = e.value;
+                    },
+                },
+            ],
+        },
+        {
             uname: 'action.folder',
             type: 'folder',
             options: {
@@ -942,6 +1052,7 @@ let pCanvas = new p5(pCanvasFnc, 'p5-canvas');
 function call_raytracer() {
     const newObjects = formatObjects();
     // console.log(JSON.stringify(newObjects));
+    const vec3ToArr = (v) => [v.x, v.y, v.z];
 
     if (worker.init) {
         worker.postMessage({
@@ -952,7 +1063,15 @@ function call_raytracer() {
                 height: scene.image.height,
                 samples: scene.image.samplesPerPixel,
                 depth: scene.image.rayDepth,
-                objects: newObjects
+                objects: newObjects,
+                camera: {
+                    position: vec3ToArr(scene.camera.position),
+                    lookat: vec3ToArr(scene.camera.lookAt),
+                    vup: vec3ToArr(scene.camera.vup),
+                    vfov: scene.camera.vfov,
+                    aperture: scene.camera.aperture,
+                    focal_length: scene.camera.focalLength,
+                }
             }
         })
     } else {
@@ -1009,9 +1128,8 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 {
 
 
-    camera.position.set(13.0, 2.0, 3.0);
-    camera.lookAt(0.0, 0.0, 0.0);
-
+    camera.position.set(scene.camera.position.x, scene.camera.position.y, scene.camera.position.z);
+    camera.lookAt(scene.camera.lookAt.x, scene.camera.lookAt.y, scene.camera.lookAt.z);
 
 
     renderer.setSize(scene.image.width * scene.image.postScale,
@@ -1042,10 +1160,13 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 }
 
 let lastObjects = JSON.stringify(objects);
+let lastScene = JSON.stringify(scene);
 
 setInterval(
     () => {
-        if (lastObjects !== JSON.stringify(objects)) {
+        if (lastObjects !== JSON.stringify(objects) ||
+
+            lastScene !== JSON.stringify(scene)) {
             console.log('redraw');
             group.children = [];
             objects.shapes.forEach((shape) => {
@@ -1054,6 +1175,7 @@ setInterval(
             // requestAnimationFrame(animate);
             renderer.render(scene3, camera);
             lastObjects = JSON.stringify(objects);
+            lastScene = JSON.stringify(scene);
         }
     }, 1000
 );

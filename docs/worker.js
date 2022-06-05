@@ -13,7 +13,8 @@ onmessage = function (e) {
                 a.height,
                 a.samples,
                 a.depth,
-                a.objects
+                a.objects,
+                a.camera,
             );
             postMessage({ action: 'render', start: e.data.start, output: output });
         }

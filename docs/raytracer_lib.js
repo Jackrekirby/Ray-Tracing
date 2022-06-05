@@ -134,13 +134,15 @@ function addBorrowedObject(obj) {
 * @param {number} samples_per_pixel
 * @param {number} depth
 * @param {any} objects_js
+* @param {any} camera_js
 * @returns {any}
 */
-export function run_raytracer(width, height, samples_per_pixel, depth, objects_js) {
+export function run_raytracer(width, height, samples_per_pixel, depth, objects_js, camera_js) {
     try {
-        const ret = wasm.run_raytracer(width, height, samples_per_pixel, depth, addBorrowedObject(objects_js));
+        const ret = wasm.run_raytracer(width, height, samples_per_pixel, depth, addBorrowedObject(objects_js), addBorrowedObject(camera_js));
         return takeObject(ret);
     } finally {
+        heap[stack_pointer++] = undefined;
         heap[stack_pointer++] = undefined;
     }
 }

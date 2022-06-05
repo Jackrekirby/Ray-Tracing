@@ -191,30 +191,13 @@ impl Image {
         samples_per_pixel: u16,
         depth: u16,
         objects: &mut Objects,
+        camera: &Camera,
     ) -> Self {
         let mut image = Image::new(width, height);
         const CM: f32 = 255.999; // color multiplier
 
         let w = (image.width - 1) as f32;
         let h = (image.height - 1) as f32;
-        let aspect_ratio: f32 = (width as f32) / (height as f32);
-
-        let position = Vec3A::new(13.0, 2.0, 3.0);
-        let lookat = Vec3A::new(0.0, 0.0, 0.0);
-        let vup = Vec3A::new(0.0, 1.0, 0.0);
-        let vfov = 20.0;
-        let aperture = 0.1;
-        let focal_length = 10.0;
-
-        let camera = Camera::new(
-            position,
-            lookat,
-            vup,
-            vfov,
-            aspect_ratio,
-            aperture,
-            focal_length,
-        );
 
         // let serialized = serde_json::to_string(&objects).unwrap();
         // println!("{}", serialized);
